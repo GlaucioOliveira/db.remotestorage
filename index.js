@@ -2,6 +2,8 @@ const express = require('express');
 const mysql = require('mysql');
 
 const app = express();
+const cors = require('cors');
+
 const port = 3001;
 
 const db_host = process.env.HOST;
@@ -11,29 +13,33 @@ const db_database = process.env.DATABASE;
 
 const apiBase = process.env.API_BASE;
 
-const db = mysql.createConnection({
-  host: db_host,
-  user: db_user,
-  password: db_pass,
-  database: db_database
-});
-
-function connectDatabase()
-{
-  db.connect((err) => {
-  if (err) {
-    console.error('Error connecting to MySQL: ', err);
-    setTimeout(connectDatabase, 10000);
-  } else {
-    console.log('Connected to MySQL');
-  }
-});
+// Function to create a database connection
+function createConnection() {
+  return mysql.createConnection({
+    host: db_host,
+    user: db_user,
+    password: db_pass,
+    database: db_database,
+  });
 }
 
-connectDatabase();
+// Use the cors middleware to allow any origin
+app.use(cors());
 
 // Middleware to parse JSON
 app.use(express.json());
+
+// Middleware to handle database connection for each request
+app.use((req, res, next) => {
+  req.db = createConnection();
+  req.db.connect((err) => {
+    if (err) {
+      console.error('Error connecting to MySQL: ', err);
+      return res.status(500).send('Database connection error');
+    }
+    next();
+  });
+});
 
 // Get Remote Storage
 app.get(`${apiBase}/:key/:secret`, (req, res) => {
@@ -42,7 +48,7 @@ app.get(`${apiBase}/:key/:secret`, (req, res) => {
   const sql = 'SELECT `key`, `value` from remotestorage where `key` = ? and `secret` = ?';
 
   try{
-    db.query(sql, [key, secret], (err, result) => {
+    req.db.query(sql, [key, secret], (err, result) => {
       if (err) {
         console.error('Error getting meeting: ', err);
         res.status(500).send('Error getting meeting');
@@ -54,6 +60,9 @@ app.get(`${apiBase}/:key/:secret`, (req, res) => {
   catch(ex){
     res.status(500).send(ex);
   }
+  finally{
+    req.db.end();
+  }  
 });
 
 // Create
@@ -63,7 +72,7 @@ app.post(`${apiBase}`, (req, res) => {
   const sql = 'INSERT INTO remotestorage values (0, ?, ?, ?)';
 
   try{
-      db.query(sql, [key, value, secret], (err, result) => {
+    req.db.query(sql, [key, value, secret], (err, result) => {
     if (err) {
       console.error('Error creating remote storage: ', err);
       res.status(500).send('Error creating remote storage');
@@ -84,7 +93,7 @@ app.put(`${apiBase}`, (req, res) => {
     let Id = 0;
 
     try{    
-    db.query('select Id from remotestorage where `key` = ? and `secret` = ?', [key, secret], (err, result) => {
+      req.db.query('select Id from remotestorage where `key` = ? and `secret` = ?', [key, secret], (err, result) => {
       if (err) {
         console.error('something worng happened while trying to verify if remotesotrage exists: ', err);
       } else {
@@ -95,7 +104,7 @@ app.put(`${apiBase}`, (req, res) => {
           const sql = 'UPDATE remotestorage SET value = ? where Id = ?';
           console.log(sql);
     
-          db.query(sql, [value, Id], (err, result) => {
+          req.db.query(sql, [value, Id], (err, result) => {
             if (err) {
               console.error('Error getting remote storage: ', err);
               res.status(500).send('Error getting remote storage');
@@ -108,7 +117,7 @@ app.put(`${apiBase}`, (req, res) => {
           const sql = 'INSERT INTO remotestorage values (0, ?, ?, ?)';
           console.log(sql);
     
-          db.query(sql, [key, value, secret], (err, result) => {
+          req.db.query(sql, [key, value, secret], (err, result) => {
             if (err) {
               console.error('Error creating remote storage: ', err);
               res.status(500).send('Error creating remote storage');
@@ -123,6 +132,9 @@ app.put(`${apiBase}`, (req, res) => {
   catch(ex){
     res.status(500).send(ex);
   }
+  finally{
+    req.db.end();
+  }
 
 });
 
@@ -133,19 +145,23 @@ app.delete(`${apiBase}/:key/:secret`, (req, res) => {
   const sql = 'DELETE FROM reuniao WHERE `key` = ? and `secret` = ?';
 
   try{
-      db.query(sql, [key, secret], (err, result) => {
-    if (err) {
-      console.error('Error deleting remote storage: ', err);
-      res.status(500).send('Error deleting remote storage');
-    } else {
-      res.status(200).send('remote storage deleted successfully');
-    }
+    req.db.query(sql, [key, secret], (err, result) => {
+      if (err) {
+        console.error('Error deleting remote storage: ', err);
+        res.status(500).send('Error deleting remote storage');
+      } else {
+        res.status(200).send('remote storage deleted successfully');
+      }
   });
   }
   catch(ex)
   {
     res.status(500).send(ex);
   }
+  finally{
+    req.db.end();
+  }
+
 });
 
 app.listen(port, () => {
