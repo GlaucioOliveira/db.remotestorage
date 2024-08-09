@@ -84,9 +84,9 @@ app.get(`${apiBase}/:key/:secret`, async (req, res) => {
   catch(ex){
     res.status(500).send(ex);
   }
-  finally{
-    await req.db.end();
-  }
+  // finally{
+  //   await req.db.end();
+  // }
 });
 
 app.put(`${apiBase}`, async (req, res) => {
@@ -134,9 +134,9 @@ app.put(`${apiBase}`, async (req, res) => {
   catch(ex){
     res.status(500).send(ex);
   }
-  finally{
-    await req.db.end();
-  }
+  // finally{
+  //   await req.db.end();
+  // }
 
 });
 
