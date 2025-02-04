@@ -14,41 +14,35 @@ const db_database = process.env.DATABASE;
 const apiBase = process.env.API_BASE;
 
 // Function to create a database connection
-function createConnection() {
-  return mysql.createConnection({
-    host: db_host,
-    user: db_user,
-    password: db_pass,
-    database: db_database,
-  });
-}
+const pool = mysql.createPool({
+  host: db_host,
+  user: db_user,
+  password: db_pass,
+  database: db_database,
+  connectionLimit: 10,
+});
 
 // Use the cors middleware to allow any origin
-app.use(cors());
+app.use(cors({ origin: '*' }));
 
 // Middleware to parse JSON
 app.use(express.json());
 
-// Middleware to handle database connection for each request
-app.use(async (req, res, next) => {
-  req.db = createConnection();
-  await req.db.connect((err) => {
-    if (err) {
-      console.error('Error connecting to MySQL: ', err);
-      return res.status(500).send('Database connection error');
-    }
-    next();
-  });
+// Middleware to attach the database connection
+app.use((req, res, next) => {
+  req.db = pool;
+  next();
 });
 
+
 // Get Remote Storage
-app.get(`${apiBase}/:key/:secret`, async (req, res) => {
+app.get(`${apiBase}/:key/:secret`, (req, res) => {
   const key = req.params.key;
   const secret = req.params.secret;
   const sql = 'SELECT `key`, `value` from remotestorage where `key` = ? and `secret` = ?';
 
   try{
-    await req.db.query(sql, [key, secret], (err, result) => {
+    req.db.query(sql, [key, secret], (err, result) => {
       if (err) {
         console.error('Error getting meeting: ', err);
         res.status(500).send('Error getting meeting');
@@ -61,18 +55,18 @@ app.get(`${apiBase}/:key/:secret`, async (req, res) => {
     res.status(500).send(ex);
   }
   finally{
-    await req.db.end();
+    //await req.db.end();
   }  
 });
 
 // Create
- app.post(`${apiBase}`, async (req, res) => {
+ app.post(`${apiBase}`, (req, res) => {
     const {key, value, secret} = req.body;
 
   const sql = 'INSERT INTO remotestorage values (0, ?, ?, ?)';
 
   try{
-    await req.db.query(sql, [key, value, secret], (err, result) => {
+    req.db.query(sql, [key, value, secret], (err, result) => {
     if (err) {
       console.error('Error creating remote storage: ', err);
       res.status(500).send('Error creating remote storage');
@@ -89,13 +83,13 @@ app.get(`${apiBase}/:key/:secret`, async (req, res) => {
   // }
 });
 
-app.put(`${apiBase}`, async (req, res) => {
+app.put(`${apiBase}`, (req, res) => {
     //const key = req.params.key;
     const {key, value, secret} = req.body;
     let Id = 0;
 
     try{    
-      await req.db.query('select Id from remotestorage where `key` = ? and `secret` = ?', [key, secret], async (err, result) => {
+      req.db.query('select Id from remotestorage where `key` = ? and `secret` = ?', [key, secret], (err, result) => {
       if (err) {
         console.error('something worng happened while trying to verify if remotesotrage exists: ', err);
       } else {
@@ -106,7 +100,7 @@ app.put(`${apiBase}`, async (req, res) => {
           const sql = 'UPDATE remotestorage SET value = ? where Id = ?';
           console.log(sql);
     
-          await req.db.query(sql, [value, Id], (err, result) => {
+          req.db.query(sql, [value, Id], (err, result) => {
             if (err) {
               console.error('Error getting remote storage: ', err);
               res.status(500).send('Error getting remote storage');
@@ -119,7 +113,7 @@ app.put(`${apiBase}`, async (req, res) => {
           const sql = 'INSERT INTO remotestorage values (0, ?, ?, ?)';
           console.log(sql);
     
-          await req.db.query(sql, [key, value, secret], async (err, result) => {
+          req.db.query(sql, [key, value, secret], (err, result) => {
             if (err) {
               console.error('Error creating remote storage: ', err);
               res.status(500).send('Error creating remote storage');
@@ -141,13 +135,13 @@ app.put(`${apiBase}`, async (req, res) => {
 });
 
 // Delete
-app.delete(`${apiBase}/:key/:secret`, async (req, res) => {
+app.delete(`${apiBase}/:key/:secret`, (req, res) => {
   const key = req.params.key;
   const secret = req.params.secret;
   const sql = 'DELETE FROM reuniao WHERE `key` = ? and `secret` = ?';
 
   try{
-    await req.db.query(sql, [key, secret], (err, result) => {
+    req.db.query(sql, [key, secret], (err, result) => {
       if (err) {
         console.error('Error deleting remote storage: ', err);
         res.status(500).send('Error deleting remote storage');
@@ -161,11 +155,11 @@ app.delete(`${apiBase}/:key/:secret`, async (req, res) => {
     res.status(500).send(ex);
   }
   finally{
-    await req.db.end();
+    //await req.db.end();
   }
 
 });
 
 app.listen(port, () => {
-  console.log(`db.remotestorage v0.0.1 - ${port}`);
+  console.log(`db.remotestorage v0.0.2 - ${port}`);
 });
