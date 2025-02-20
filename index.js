@@ -23,11 +23,24 @@ const pool = mysql.createPool({
 });
 
 // Use the cors middleware to allow any origin
-app.use(cors({ origin: '*' }));
+app.
+.use((request, response, next) => {
+  response.setHeader('Access-Control-Allow-Origin', '*');
+  response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Z-Key');
+  response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  response.setHeader('Content-Type', 'application/json');
+  next();
 
 // Middleware to parse JSON
-app.use(express.json());
-
+app.use(express.json())
+   .use((request, response, next) => {
+    response.setHeader('Access-Control-Allow-Origin', '*');
+    response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Z-Key');
+    response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.setHeader('Content-Type', 'application/json');
+    next();
+  });
+  
 // Middleware to attach the database connection
 app.use((req, res, next) => {
   req.db = pool;
